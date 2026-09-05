@@ -388,6 +388,21 @@ export interface IWidgetSvcConfig {
 
   /** Use by racetimer widget */
   timerLength?: number;
+  /**
+   * Height in pixels of the racer widgets' button row. Fixed rather than a share of the
+   * widget so the buttons stay the same size, and stay comfortably pressable with a
+   * finger on a phone, whatever height the widget is given on the dashboard.
+   */
+  buttonRowHeight?: number;
+  /**
+   * How far the start-line drawing may drift out of true, as a percentage of the
+   * drawing's height, before it re-fits its view. Re-fitting on every position update
+   * makes the line slide about under a boat that appears to stand still; holding the
+   * view until it has actually gone stale keeps the line still and lets the boat close
+   * on it. 0 re-fits on every update. The view is re-fitted regardless if the boat
+   * would otherwise be clipped, or if the drawing is resized or the line is edited.
+   */
+  viewSmoothing?: number;
   /** The next dashboard to display when the racer-timer-widget counts to 0 and the boat is not OCS*/
   nextDashboard?: number;
   /** If true, play beeps when the racer-timer-widget counts to through the minutes, 10s and each of the last 10s. */

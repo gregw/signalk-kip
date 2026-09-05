@@ -30,6 +30,9 @@ import {MatInput} from '@angular/material/input';
 
 @Component({
   selector: 'widget-racer-timer',
+  // Sized on the host so the row is the same height in every racer widget, whatever
+  // the template around it looks like.
+  host: { '[style.--racer-button-row]': "buttonRowHeight() + 'px'" },
   templateUrl: './widget-racer-timer.component.html',
   styleUrls: ['./widget-racer-timer.component.scss'],
   imports: [FormsModule, MatButtonModule, MatIconModule, MatTooltipModule, MatInput]
@@ -43,6 +46,7 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   // Static config
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     supportAutomaticHistoricalSeries: false,
+    buttonRowHeight: 68,
     displayName: 'TTS',
     nextDashboard: 0,
     playBeeps: true,
@@ -86,6 +90,10 @@ export class WidgetRacerTimerComponent implements AfterViewInit, OnDestroy {
   protected startAtTime = signal<string>('00:00:00');
   protected startAtTimeEdit = model<string>('');
   private readonly normalizedConfig = computed<IWidgetSvcConfig>(() => this.runtime.options() ?? WidgetRacerTimerComponent.DEFAULT_CONFIG);
+
+  /** Fixed height of the button row, so touch targets do not shrink with the widget. */
+  protected readonly buttonRowHeight = computed<number>(() =>
+    (this.runtime.options() ?? WidgetRacerTimerComponent.DEFAULT_CONFIG).buttonRowHeight ?? 68);
 
   constructor() {
     // Theme / palette effect

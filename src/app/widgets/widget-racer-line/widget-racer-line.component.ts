@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  computed,
   DestroyRef,
   effect,
   ElementRef,
@@ -26,6 +27,9 @@ import {MatTooltipModule} from '@angular/material/tooltip';
 
 @Component({
   selector: 'widget-racer-line',
+  // Sized on the host so the row is the same height in every racer widget, whatever
+  // the template around it looks like.
+  host: { '[style.--racer-button-row]': "buttonRowHeight() + 'px'" },
   templateUrl: './widget-racer-line.component.html',
   styleUrls: ['./widget-racer-line.component.scss'],
   imports: [MatButtonModule, MatIconModule, MatTooltipModule]
@@ -47,6 +51,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   // Static config from legacy defaultConfig
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     supportAutomaticHistoricalSeries: false,
+    buttonRowHeight: 68,
     displayName: 'DTS',
     filterSelfPaths: true,
     playBeeps: true,
@@ -179,6 +184,10 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private get pathsRecord(): Record<string, IWidgetPath> {
     return ((this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG).paths as Record<string, IWidgetPath> | undefined) ?? {};
   }
+
+  /** Fixed height of the button row, so touch targets do not shrink with the widget. */
+  protected readonly buttonRowHeight = computed<number>(() =>
+    (this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG).buttonRowHeight ?? 68);
 
   constructor() {
     // Theme/palette effect
@@ -324,6 +333,12 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
 
   public setLineEnd(end: string): string {
     return this.signalk.putRequest('navigation.racing.setStartLine', {end, position: 'bow'}, this.id()) ?? '';
+  }
+
+  public swapLineEnds(): string {
+    // The plugin carries the collected VMG samples across with the ends rather than
+    // discarding them, since reversing the bearing just relabels every sample.
+    return this.signalk.putRequest('navigation.racing.swapStartLine', {}, this.id()) ?? '';
   }
 
   public adjustLineEnd(end: string, delta: number, rotateRadians: number): string {

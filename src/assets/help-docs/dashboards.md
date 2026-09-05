@@ -91,6 +91,7 @@ KIP widgets turn Signal K data into readable visuals and controls. Available wid
 - **Embed Webpage Viewer** – Embeds external web apps (Grafana, Node-RED, etc.) into your dashboard.
 - **Racesteer** – Race steering display fusing polar performance data with live conditions for optimal tactics.
 - **Racer - Start Line Insight** – Set and adjust start line ends, see distance, favored end, and line bias; integrates with Freeboard SK.
+- **Racer - Start Line Approach** – Draws the start line with your boat against it, projecting where you reach at the gun on your current course and on the best course you have recently sailed; a second mode shows and adjusts the four best VMGs behind the time to line. Needs signalk-racer 1.2.0 or later.
 - **Racer - Start Timer** – Advanced racing countdown timer with OCS status and auto dashboard switching.
 - **Countdown Timer** – Simple race start countdown timer with start, pause, sync, and reset options.
 

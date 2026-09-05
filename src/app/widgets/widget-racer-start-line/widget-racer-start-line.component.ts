@@ -118,14 +118,40 @@ interface IViewFrame {
   midC: number;
 }
 
+/**
+ * One leg of the approach, drawn as a dimension line: a rule with a tick at each end and
+ * its value set into a break in the middle, so it reads as a measurement rather than as
+ * a course to steer. Both legs are axis-aligned on screen, the drawing being line-up.
+ */
+interface ISceneLeg {
+  x1: number; y1: number; x2: number; y2: number;
+  /** End ticks, drawn across the leg. */
+  ticks: string;
+  label: string;
+  labelX: number; labelY: number;
+  /** Horizontal legs label above the rule, vertical ones label beside it. */
+  anchor: 'middle' | 'start' | 'end';
+  title: string;
+}
+
 /** Everything the template draws, in viewBox units. */
 interface IScene {
   portX: number; stbX: number; lineY: number;
   ends: ISceneEnds;
-  label: string; labelX: number; labelY: number; arrowPoints: string;
+  label: string; labelX: number; labelY: number;
   projections: ISceneProjection[];
   boat: { path: string; ocs: boolean; title: string } | null;
   vmgs: ISceneVmg[] | null;
+  /**
+   * The start zone: the line's own extensions and the 45 degree wedges off each end,
+   * drawn faintly because they are what decides which legs the time to line is built
+   * from, not part of the course itself.
+   */
+  guides: { x1: number; y1: number; x2: number; y2: number }[];
+  /** The approach the time to line is computed over: along to the zone, then across. */
+  legs: ISceneLeg[];
+  /** Where the boat reaches along those legs at the gun, at the effective VMGs. */
+  gun: { x: number; y: number; title: string } | null;
   /** Size of the VMG values, grown to fill whatever room the cross has. */
   vmgFont: number;
   /** Size of the length and heading label, shrunk from LABEL_FONT if it would not fit. */
@@ -161,6 +187,7 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
     playBeeps: true,
     numDecimal: 1,
     viewSmoothing: 10,
+    showBestApproach: false,
     color: 'contrast',
     enableTimeout: false,
     dataTimeout: 5,
@@ -282,6 +309,23 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
         convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'm', sampleTime: 10000
       },
+      effectiveVmgToLinePath: {
+        // What the plugin's time to line actually divides the perpendicular leg by:
+        // the collected best, or the VMG being sailed now if that is better. Published
+        // from signalk-racer 1.3.0; derived locally when it is absent.
+        description: 'VMG the perpendicular leg of the time to line is divided by',
+        path: 'self.navigation.racing.effectiveVmg.toLine',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      effectiveVmgAlongLinePath: {
+        description: 'VMG the along-line leg of the time to line is divided by',
+        path: 'self.navigation.racing.effectiveVmg.alongLine',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
       vmgToCourseSidePath: {
         description: 'Best VMG across the line towards the course side',
         path: 'self.navigation.racing.bestVmg.toCourseSide',
@@ -387,6 +431,9 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
   private readonly timeToStart = signal<number | null>(null);
   private readonly timerRunning = signal<boolean>(false);
   private readonly boatLength = signal<number | null>(null);
+  // The effective VMGs as the plugin publishes them, null against an older one.
+  private readonly effVmgToLine = signal<number | null>(null);
+  private readonly effVmgAlongLine = signal<number | null>(null);
   private readonly bestVmg = signal<Record<TVmgName, number | null>>(
     { toCourseSide: null, toPortEnd: null, toStbEnd: null, fromCourseSide: null });
   private readonly vmgOverride = signal<Record<TVmgName, number | null>>(
@@ -443,6 +490,8 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
     this.observeNumber('approachSogPath', this.approachSog);
     this.observeNumber('ttsPath', this.timeToStart);
     this.observeNumber('boatLengthPath', this.boatLength);
+    this.observeNumber('effectiveVmgToLinePath', this.effVmgToLine);
+    this.observeNumber('effectiveVmgAlongLinePath', this.effVmgAlongLine);
 
     effect(() => {
       if (!this.pathsRecord['startTimePath']?.path) return;
@@ -585,33 +634,33 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
     // straight up the screen.
     const startBearing = (lineBearing + 90) % 360;
 
-    const label = `${length.toFixed(0)}${this.unitSuffix(lengthCfg?.convertUnitTo)} \u00b7 ` +
-      `${startBearing.toFixed(0).padStart(3, '0')}\u00b0T`;
-    // Full size unless the label plus its arrow would run off a narrow widget.
-    const font = Math.min(this.LABEL_FONT, (W - 8) / (label.length * 0.51 + 0.96));
+    // The trailing arrow says the heading is the way to sail to start - in this line-up
+    // view always straight up the screen - so it needs no separate arrowhead.
+    const label = `${this.formatDistance(length, lengthCfg?.convertUnitTo)} \u00b7 ` +
+      `${startBearing.toFixed(0).padStart(3, '0')}\u00b0T\u2191`;
+    // Full size unless the label would run off a narrow widget.
+    const font = Math.min(this.LABEL_FONT, (W - 8) / (label.length * 0.51));
     const labelY = lineY - font * 0.5;
     // Centred on the line, but held inside the drawing: the line can sit well off centre
     // when the fit has to reach out to a distant boat, and the label is often wider than
     // the line itself.
     const labelHalf = label.length * font * 0.51 / 2;
     const labelX = Math.min(
-      Math.max((portX + stbX) / 2 - font * 0.64, labelHalf + 4),
-      W - labelHalf - font * 0.96 - 4);
-    // Arrow beside the heading, pointing the way to sail to start.
-    const ax = labelX + labelHalf + font * 0.64;
-    const arrowPoints = `${ax},${labelY - font * 0.91} ${ax - font * 0.32},${labelY - font * 0.18} ` +
-      `${ax + font * 0.32},${labelY - font * 0.18}`;
+      Math.max((portX + stbX) / 2, labelHalf + 4), W - labelHalf - 4);
 
     const scene: IScene = {
       portX, stbX, lineY, ends: this.buildEnds(stbX, lineY, scale),
-      label, labelX, labelY, arrowPoints,
+      label, labelX, labelY,
       projections: [], boat: null, vmgs: null,
+      guides: [], legs: [], gun: null,
       vmgFont: 0, labelFont: font
     };
 
     if (vmgMode) {
       this.buildVmgCross(scene, W, lineY, yMax);
     } else if (boat) {
+      this.buildZone(scene, geo, sx, sy, W, scale);
+      this.buildApproach(scene, geo, sx, sy, scale, W);
       this.buildBoat(scene, geo, sx(boat.a), sy(boat.c), lineY, boat.c < 0, scale);
     }
     return scene;
@@ -734,6 +783,195 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
+   * The line's own extensions, and the 45 degree wedge off each end. Together these
+   * bound the start zone: inside it the line is closed straight across, outside it the
+   * boat must first run along the line to get in. The plugin decides its legs on exactly
+   * this boundary, so drawing it is what makes the approach below explicable.
+   */
+  private buildZone(scene: IScene, geo: ILineGeometry, sx: (a: number) => number,
+    sy: (c: number) => number, W: number, scale: number): void {
+    // Far enough that every guide leaves the drawing rather than stopping inside it.
+    const reach = (W + this.VB_HEIGHT) / Math.max(scale, 1e-6);
+    const L = geo.length;
+    const add = (a1: number, c1: number, a2: number, c2: number) =>
+      scene.guides.push({ x1: sx(a1), y1: sy(c1), x2: sx(a2), y2: sy(c2) });
+
+    // The line carried on past each end.
+    add(0, 0, -reach, 0);
+    add(L, 0, L + reach, 0);
+    // The wedges: 45 degrees off each end, on both sides of the line.
+    add(0, 0, -reach, reach);
+    add(0, 0, -reach, -reach);
+    add(L, 0, L + reach, reach);
+    add(L, 0, L + reach, -reach);
+  }
+
+  /**
+   * The approach the time to line is actually computed over, drawn as dimension lines.
+   *
+   * The plugin does not sail a bearing to work out the time to line. It takes two legs:
+   * outside the start zone, the distance along the line needed to enter the zone divided
+   * by the best VMG in that direction, plus the perpendicular distance to the line
+   * divided by the best VMG across it. Drawing a straight line on the course that
+   * happened to record the best sample - which is what the faint line used to be - shows
+   * a different quantity from the number beside it, which is why it read as nothing in
+   * particular.
+   *
+   * So this draws the legs themselves, at their true lengths, with a mark showing how far
+   * along them the boat gets by the gun. Nobody sails parallel to the line and then turns
+   * ninety degrees, so the legs are styled as dimension lines: they are a measurement,
+   * not a course.
+   */
+  private buildApproach(scene: IScene, geo: ILineGeometry, sx: (a: number) => number,
+    sy: (c: number) => number, scale: number, W: number): void {
+    const boat = geo.boat;
+    if (!boat) return;
+    const L = geo.length, a = boat.a, c = boat.c;
+    const ocs = c < 0;
+    const across = Math.abs(c);
+
+    // How far past an end the boat lies, and which way it would have to run to get back.
+    let overshoot = 0, beyondPort = false;
+    if (a > L) { overshoot = a - L; beyondPort = true; } else if (a < 0) { overshoot = -a; }
+
+    // Inside the 45 degree wedge the zone leg vanishes: the boat can close straight
+    // across. Outside it, the corner sits where the wedge meets the boat's own offset.
+    const toZone = Math.max(0, overshoot - across);
+    const cornerA = toZone > 0 ? (beyondPort ? L + across : -across) : a;
+
+    // The VMGs the plugin would use for these legs: the collected best, or whatever the
+    // boat is achieving right now if that is better - which is what computeTimeToLine
+    // does, so the drawing matches the published time rather than undercutting it.
+    const parallelName: TVmgName = beyondPort ? 'toStbEnd' : 'toPortEnd';
+    const normalName: TVmgName = ocs ? 'fromCourseSide' : 'toCourseSide';
+    // Prefer what the plugin says it used; fall back to deriving it the same way when
+    // running against a version that does not publish it.
+    const parallel = this.effVmgAlongLine() ?? this.deriveEffectiveVmg(parallelName, geo.bearing);
+    const normal = this.effVmgToLine() ?? this.deriveEffectiveVmg(normalName, geo.bearing);
+
+    // Each leg is labelled with how far it is - a dimension states a distance - while the
+    // VMG it would be sailed at stays on the hover text and on the VMG tab.
+    if (toZone > 0) {
+      scene.legs.push(this.buildLeg(
+        sx(a), sy(c), sx(cornerA), sy(c), true, this.formatDistance(toZone),
+        `Along the line to the start zone at `
+        + `${VMG_TITLE[parallelName].replace('Best VMG ', '')}`, W));
+    }
+    if (across > 0) {
+      scene.legs.push(this.buildLeg(
+        sx(cornerA), sy(c), sx(cornerA), sy(0), false, this.formatDistance(across),
+        `Across to the line at `
+        + `${VMG_TITLE[normalName].replace('Best VMG ', '')}`, W));
+    }
+
+    // Where the boat gets to by the gun, walked along those legs at those VMGs. Short of
+    // the line is late, past it is over early - the same reading as the COG projection,
+    // but as a position along a route rather than the tip of a floating bearing.
+    const tts = this.timeToStart();
+    if (!this.timerRunning() || tts == null || tts <= 0) return;
+    const alongTime = parallel > 0 ? toZone / parallel : Infinity;
+    let gunA: number, gunC: number;
+    if (tts <= alongTime) {
+      const run = parallel * tts;
+      gunA = beyondPort ? a - run : a + run;
+      gunC = c;
+    } else {
+      if (!(normal > 0)) return;
+      // Clamped a little past the line: a long countdown runs the mark off the drawing.
+      const run = Math.min(normal * (tts - alongTime), across + 400 / Math.max(scale, 1e-6));
+      gunA = cornerA;
+      gunC = ocs ? c + run : c - run;
+    }
+    scene.gun = {
+      x: sx(gunA), y: sy(gunC),
+      title: 'Where you reach at the gun, sailing these legs at these VMGs'
+    };
+  }
+
+  /** One leg of the approach, as a dimension line with end ticks and a labelled break. */
+  private buildLeg(x1: number, y1: number, x2: number, y2: number, horizontal: boolean,
+    label: string, title: string, W: number): ISceneLeg {
+    const tick = 5;
+    const ticks = horizontal
+      ? `M${x1},${y1 - tick} L${x1},${y1 + tick} M${x2},${y2 - tick} L${x2},${y2 + tick}`
+      : `M${x1 - tick},${y1} L${x1 + tick},${y1} M${x2 - tick},${y2} L${x2 + tick},${y2}`;
+
+    // A dimension's value sits in a break in the rule, but a short leg has no room for
+    // one - and the along-line leg is often very short, the boat being just outside the
+    // wedge. Below that, the label goes outside the far tick instead, the way a drawing
+    // takes a dimension outside its own extension lines.
+    const length = Math.hypot(x2 - x1, y2 - y1);
+    const roomy = length > label.length * 9 + 16;
+    let labelX: number, labelY: number, anchor: ISceneLeg['anchor'];
+    if (horizontal) {
+      if (roomy) {
+        labelX = (x1 + x2) / 2;
+        labelY = (y1 + y2) / 2 - 6;
+        anchor = 'middle';
+      } else {
+        // Out past the corner and below the rule: the boat sits on this leg's other end,
+        // and the across leg runs up from the corner, so this corner is the free quarter.
+        labelX = x1 < x2 ? x2 + 8 : x2 - 8;
+        labelY = (y1 + y2) / 2 + 17;
+        anchor = x1 < x2 ? 'start' : 'end';
+      }
+    } else {
+      labelX = x1 + 8;
+      anchor = 'start';
+      labelY = roomy ? (y1 + y2) / 2 + 5 : (y1 < y2 ? y1 - 8 : y1 + 14);
+    }
+    // Held inside the drawing: a label pushed outside a short leg can otherwise run off
+    // the edge, which is exactly when it gets pushed out.
+    const width = label.length * 9;
+    const lead = anchor === 'end' ? width : anchor === 'middle' ? width / 2 : 0;
+    const trail = anchor === 'start' ? width : anchor === 'middle' ? width / 2 : 0;
+    labelX = Math.min(Math.max(labelX, lead + 3), Math.max(W - trail - 3, lead + 3));
+
+    return { x1, y1, x2, y2, ticks, label, title, labelX, labelY, anchor };
+  }
+
+  /**
+   * A distance in metres, in whatever length unit the widget is configured for - so the
+   * legs, and the line's own length, all read in the same units.
+   *
+   * @param unit Defaults to the unit the line length is displayed in.
+   */
+  private formatDistance(metres: number, unit?: string): string {
+    const to = unit ?? this.pathsRecord['lineLengthPath']?.convertUnitTo ?? 'm';
+    const value = this.units.convertToUnit(to, metres) ?? metres;
+    // Nautical miles and kilometres need decimals to say anything at these distances.
+    const decimals = to === 'nm' || to === 'km' || to === 'mi' ? 2 : 0;
+    return `${value.toFixed(decimals)}${this.unitSuffix(to)}`;
+  }
+
+  /**
+   * The VMG the plugin would divide a leg by: the collected best, or the one the boat is
+   * achieving right now if that is better - the same rule as the plugin's own
+   * effectiveVmg. Only used against a plugin that does not publish that directly.
+   * Returned in metres per second, whatever unit the path is displayed in.
+   */
+  private deriveEffectiveVmg(name: TVmgName, lineBearingDeg: number): number {
+    const display = this.bestVmg()[name];
+    const unit = this.pathsRecord[VMG_PATH_KEY[name]]?.convertUnitTo ?? 'm/s';
+    const perBaseUnit = this.units.convertToUnit(unit, 1) || 1;
+    let best = display == null ? 0 : display / perBaseUnit;
+
+    const cog = this.cog(), sog = this.sog();
+    if (cog != null && sog != null) {
+      const angle = cog - lineBearingDeg * Math.PI / 180;
+      // Positive towards the course side, and towards the port end, matching the
+      // plugin's own decomposition.
+      const normal = sog * Math.sin(angle);
+      const tangent = sog * Math.cos(angle);
+      const instant = name === 'toCourseSide' ? normal
+        : name === 'fromCourseSide' ? -normal
+          : name === 'toPortEnd' ? tangent : -tangent;
+      if (instant > 0) best = Math.max(best, instant);
+    }
+    return best;
+  }
+
+  /**
    * The pin and the committee boat marking the ends. Both stand for a 10m object, drawn
    * at an exaggerated multiple of the line's own scale and then clamped, so they read as
    * landmarks whether the drawing is zoomed out to a distant line or in on a close one.
@@ -777,7 +1015,11 @@ export class WidgetRacerStartLineComponent implements AfterViewInit, OnDestroy {
       const approachCog = this.approachCog(), approachSog = this.approachSog();
 
       if (running) {
-        if (approachCog != null && approachSog != null && approachSog > 0) {
+        // Off by default: a real point of sail, but not the path the time to line is
+        // built on, and shown beside that path the two get confused.
+        const showApproach = (this.runtime.options()
+          ?? WidgetRacerStartLineComponent.DEFAULT_CONFIG).showBestApproach ?? false;
+        if (showApproach && approachCog != null && approachSog != null && approachSog > 0) {
           const av = screenVector(approachCog, geo.bearing);
           const len = project(approachSog);
           scene.projections.push({

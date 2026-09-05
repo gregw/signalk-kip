@@ -151,6 +151,11 @@
                   />
                 </mat-form-field>
               }
+              @if (($safeNavigationMigration(widgetConfig?.showBestApproach) !== undefined)) {
+                <mat-checkbox name="showBestApproach" formControlName="showBestApproach">
+                  Show best VMG course sailed
+                </mat-checkbox>
+              }
               @if (($safeNavigationMigration(widgetConfig?.buttonRowHeight) !== undefined)) {
                 <mat-form-field>
                   <mat-label>Button Row Height</mat-label>

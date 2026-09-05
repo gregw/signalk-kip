@@ -472,7 +472,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     return this.dtsValue.toFixed(cfg?.numDecimal ?? 0);
   }
 
-  private toHHMMSS(totalSeconds: number): string {
+  private toHHMMSS(totalSeconds: number | null): string {
     if (totalSeconds == null || isNaN(totalSeconds)) return '-:--';
     const negative = totalSeconds < 0;
     if (negative) totalSeconds = -totalSeconds;
@@ -486,11 +486,14 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   }
 
   private getTimeToLineText(): string {
-    return this.toHHMMSS(this.ttlValue ?? 0);
+    return this.toHHMMSS(this.ttlValue);
   }
 
   private getTimeToBurnText(): string {
-    return this.toHHMMSS(this.ttbValue ?? 0);
+    // Left as the placeholder when there is no value, rather than falling back to zero:
+    // "0:00" reads as no time left to burn, which is a very different thing from the
+    // timer not running.
+    return this.toHHMMSS(this.ttbValue);
   }
   private setLenBias(): void {
     const cfg = this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG;

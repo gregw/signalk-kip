@@ -389,6 +389,13 @@ export interface IWidgetSvcConfig {
   /** Use by racetimer widget */
   timerLength?: number;
   /**
+   * Show the course actually sailed behind the best VMG to the line (the cog/sog
+   * recorded against the best sample) as a third projection. Off by default: it is a
+   * real point of sail, but it is not the path the time to line is computed over, and
+   * showing it alongside that path invites the two to be confused.
+   */
+  showBestApproach?: boolean;
+  /**
    * Height in pixels of the racer widgets' button row. Fixed rather than a share of the
    * widget so the buttons stay the same size, and stay comfortably pressable with a
    * finger on a phone, whatever height the widget is given on the dashboard.

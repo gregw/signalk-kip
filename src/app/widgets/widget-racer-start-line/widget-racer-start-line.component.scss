@@ -40,8 +40,7 @@
   stroke-dasharray: 10 8;
 }
 
-.line-label,
-.line-arrow {
+.line-label {
   fill: var(--racer-color);
   stroke: var(--racer-halo);
   stroke-width: 8;
@@ -53,9 +52,6 @@
   text-anchor: middle;
 }
 
-.line-arrow {
-  stroke-width: 5;
-}
 
 .port-mark {
   fill: var(--kip-port-color);
@@ -73,11 +69,54 @@
   stroke: var(--kip-blue-color);
   stroke-linecap: round;
 
-  // The course actually sailed behind the best VMG, in its own colour so it reads
-  // against the current course rather than blending into it.
+  // The course actually sailed behind the best VMG. Its own colour again, but purple
+  // now that pink belongs to the approach dimensions - this optional line must not be
+  // mistaken for them.
   &.best {
-    stroke: var(--kip-pink-color);
+    stroke: var(--kip-purple-color);
   }
+}
+
+// The start zone boundary: the line's extensions and the 45 degree wedges. Kept well
+// back so the start line itself stays the dominant object.
+.zone-guide {
+  stroke: var(--racer-dim);
+  stroke-width: 1.2;
+  stroke-opacity: 0.6;
+  stroke-dasharray: 4 5;
+}
+
+// The approach legs, drawn the way a drawing dimensions a distance - a thin rule with a
+// tick at each end and its value set into a break in it - so they read as a measurement
+// rather than as a course to steer.
+.dimension {
+  line {
+    stroke: var(--kip-pink-color);
+    stroke-width: 1.5;
+    stroke-opacity: 0.9;
+  }
+
+  text {
+    fill: var(--kip-pink-color);
+    font-size: 15px;
+    font-weight: bold;
+    stroke: var(--racer-halo);
+    stroke-width: 4;
+    paint-order: stroke;
+  }
+}
+
+.dimension-ticks {
+  stroke: var(--kip-pink-color);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+// Where the boat reaches at the gun along those legs.
+.gun-mark circle {
+  fill: var(--racer-halo);
+  stroke: var(--kip-pink-color);
+  stroke-width: 2.5;
 }
 
 .boat {

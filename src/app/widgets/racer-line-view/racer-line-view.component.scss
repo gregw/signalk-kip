@@ -66,13 +66,6 @@
 .projection {
   stroke: var(--kip-blue-color);
   stroke-linecap: round;
-
-  // The course actually sailed behind the best VMG. Its own colour again, but purple
-  // now that pink belongs to the approach dimensions - this optional line must not be
-  // mistaken for them.
-  &.best {
-    stroke: var(--kip-purple-color);
-  }
 }
 
 // The start zone boundary: the line's extensions and the 45 degree wedges. Kept well

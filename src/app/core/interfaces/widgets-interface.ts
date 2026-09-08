@@ -389,13 +389,6 @@ export interface IWidgetSvcConfig {
   /** Use by racetimer widget */
   timerLength?: number;
   /**
-   * Show the course actually sailed behind the best VMG to the line (the cog/sog
-   * recorded against the best sample) as a third projection. Off by default: it is a
-   * real point of sail, but it is not the path the time to line is computed over, and
-   * showing it alongside that path invites the two to be confused.
-   */
-  showBestApproach?: boolean;
-  /**
    * Show the countdown to the start alongside the distance to the line, above the time
    * to line it has to be read against. Off by default: the countdown has a widget of its
    * own, and leaving it out gives the distance the whole width.

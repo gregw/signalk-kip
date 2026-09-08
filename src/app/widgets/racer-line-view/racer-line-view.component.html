@@ -30,7 +30,7 @@
         }
 
         @for (p of s.projections; track $index) {
-          <line class="projection" [class.best]="p.best"
+          <line class="projection"
             [attr.x1]="p.x1" [attr.y1]="p.y1" [attr.x2]="p.x2" [attr.y2]="p.y2"
             [attr.stroke-width]="p.width" [attr.stroke-opacity]="p.opacity">
             <title>{{ p.title }}</title>

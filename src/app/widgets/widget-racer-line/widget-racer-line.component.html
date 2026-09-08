@@ -6,20 +6,22 @@
   <div class="filler">
     <canvas #canvasMainRef class="line-canvas" [class.hidden]="isViewMode()"></canvas>
   </div>
+  <!-- The VMG editor replaces the numbers. Drawn here rather than by the line
+       visualisation: it needs the four values and nothing geometric. -->
   @if (isViewMode()) {
-    <racer-line-view
-      class="line-view"
-      [data]="viewData()"
-      [vmgMode]="true"
-      [selectedVmg]="selectedVmg()"
-      [title]="displayName()"
-      [palette]="palette()"
-      [lengthUnit]="lengthUnit()"
-      [vmgUnit]="vmgUnit()"
-      [numDecimal]="numDecimal()"
-      [viewSmoothing]="viewSmoothing()"
-      [showBestApproach]="showBestApproach()" />
+    <svg class="vmg-cross" [attr.viewBox]="'0 0 ' + canvasSize().width + ' ' + canvasSize().height"
+      preserveAspectRatio="none">
+      @for (v of vmgCross(); track v.name) {
+        @if (v.selected) {
+          <rect class="vmg-selection" [attr.x]="v.box.x" [attr.y]="v.box.y"
+            [attr.width]="v.box.width" [attr.height]="v.box.height" [attr.rx]="v.box.radius" />
+        }
+        <text class="vmg-value" [class.overridden]="v.overridden" [attr.font-size]="v.font"
+          [attr.x]="v.x" [attr.y]="v.y">{{ v.text }}<title>{{ v.title }}</title></text>
+      }
+    </svg>
   }
+
   <div class="buttons-container">
     <button mat-flat-button class="button select-button" matTooltip="Select the control mode" (click)="toggleMode()">
       <mat-icon class="buttons-svg-icon">

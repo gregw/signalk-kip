@@ -14,13 +14,9 @@ import { ITheme } from '../../core/services/app-service';
 import { getColors } from '../../core/utils/themeColors.utils';
 import {
   IRacerLineViewData,
-  RacerLineViewComponent,
-  TVmgName,
-  VMG_NAMES
+  RacerLineViewComponent
 } from '../racer-line-view/racer-line-view.component';
-
-const NO_VMG: Record<TVmgName, number | null> =
-  { toCourseSide: null, toPortEnd: null, toStbEnd: null, fromCourseSide: null };
+import { NO_VMG, VMG_NAMES } from '../racer-vmg.constants';
 
 /**
  * The start line, drawn at full frame and nothing else.
@@ -50,7 +46,6 @@ export class WidgetRacerStartLineComponent {
     filterSelfPaths: true,
     numDecimal: 1,
     viewSmoothing: 10,
-    showBestApproach: false,
     color: 'contrast',
     enableTimeout: false,
     dataTimeout: 5,
@@ -140,20 +135,6 @@ export class WidgetRacerStartLineComponent {
         convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
         pathSkUnitsFilter: 'rad', sampleTime: 1000
       },
-      approachCogPath: {
-        description: 'Course sailed behind the best VMG to the line',
-        path: 'self.navigation.racing.bestApproach.cog',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
-        convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 'rad', sampleTime: 1000
-      },
-      approachSogPath: {
-        description: 'Speed sailed behind the best VMG to the line',
-        path: 'self.navigation.racing.bestApproach.sog',
-        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
-        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
-        pathSkUnitsFilter: 'm/s', sampleTime: 1000
-      },
       ttsPath: {
         description: 'Time to the start in seconds',
         path: 'self.navigation.racing.timeToStart',
@@ -232,7 +213,6 @@ export class WidgetRacerStartLineComponent {
     lat: null, lon: null, fixTime: null,
     heading: null, cog: null, sog: null,
     lineLength: null, lineBearing: null,
-    approachCog: null, approachSog: null,
     timeToStart: null, timerRunning: false, twd: null,
     boatLength: null, effVmgToLine: null, effVmgAlongLine: null,
     bestVmg: { ...NO_VMG },
@@ -256,7 +236,6 @@ export class WidgetRacerStartLineComponent {
   protected readonly title = computed<string>(() => this.cfg().displayName || 'Start Line');
   protected readonly numDecimal = computed<number>(() => this.cfg().numDecimal ?? 1);
   protected readonly viewSmoothing = computed<number>(() => this.cfg().viewSmoothing ?? 10);
-  protected readonly showBestApproach = computed<boolean>(() => this.cfg().showBestApproach ?? false);
   protected readonly lengthUnit = computed<string>(() =>
     this.pathsRecord['lineLengthPath']?.convertUnitTo ?? 'm');
   protected readonly vmgUnit = computed<string>(() =>
@@ -292,8 +271,6 @@ export class WidgetRacerStartLineComponent {
     num('sogPath', v => this.view.update(d => ({ ...d, sog: v })));
     num('lineLengthPath', v => this.view.update(d => ({ ...d, lineLength: v })));
     num('lineBearingPath', v => this.view.update(d => ({ ...d, lineBearing: v })));
-    num('approachCogPath', v => this.view.update(d => ({ ...d, approachCog: v })));
-    num('approachSogPath', v => this.view.update(d => ({ ...d, approachSog: v })));
     num('ttsPath', v => this.view.update(d => ({ ...d, timeToStart: v })));
     num('boatLengthPath', v => this.view.update(d => ({ ...d, boatLength: v })));
     num('effectiveVmgToLinePath', v => this.view.update(d => ({ ...d, effVmgToLine: v })));

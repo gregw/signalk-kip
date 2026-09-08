@@ -133,13 +133,33 @@
   visibility: hidden;
 }
 
-// The drawing sits in the same box the canvas occupies, above the button row.
-.line-view {
+// The VMG editor sits in the same box the canvas occupies, above the button row.
+.vmg-cross {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: calc(100% - var(--racer-button-row, 24%));
+
+  .vmg-value {
+    fill: var(--kip-contrast-color);
+    font-weight: bold;
+    text-anchor: middle;
+    stroke: var(--kip-widget-card-background-color, var(--kip-background));
+    stroke-width: 5;
+    paint-order: stroke;
+
+    // A manually adjusted VMG stands in for the collected samples, so it is called out.
+    &.overridden {
+      fill: var(--kip-orange-color);
+    }
+  }
+
+  .vmg-selection {
+    fill: none;
+    stroke: var(--kip-blue-color);
+    stroke-width: 2;
+  }
 }
 
 // Mode 5 packs four buttons beside the mode button, so only the middle one is fixed.

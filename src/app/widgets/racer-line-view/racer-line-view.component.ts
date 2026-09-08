@@ -13,24 +13,8 @@ import {
 } from '@angular/core';
 import { UnitsService } from '../../core/services/units.service';
 import { ILatLon, ILineGeometry, lineGeometry, screenVector } from './start-line-geometry.util';
-
-/** The four best VMGs the plugin publishes, in the order the select button cycles them. */
-export const VMG_NAMES = ['toCourseSide', 'toPortEnd', 'toStbEnd', 'fromCourseSide'] as const;
-export type TVmgName = typeof VMG_NAMES[number];
-
-/** The arrow shown on the select button, matching where the VMG sits on the cross. */
-export const VMG_ARROW: Record<TVmgName, string> = {
-  toCourseSide: '\u2191',
-  toPortEnd: '\u2190',
-  toStbEnd: '\u2192',
-  fromCourseSide: '\u2193'
-};
-export const VMG_TITLE: Record<TVmgName, string> = {
-  toCourseSide: 'Best VMG across the line towards the course side',
-  toPortEnd: 'Best VMG along the line towards the port end (pin)',
-  toStbEnd: 'Best VMG along the line towards the starboard end (committee boat)',
-  fromCourseSide: 'Best VMG back across the line from the course side, used when OCS'
-};
+import { TVmgName, VMG_NAMES, VMG_TITLE } from '../racer-vmg.constants';
+export type { TVmgName };
 
 declare global {
   interface Window {
@@ -52,7 +36,6 @@ const MODE_VMG = 1;
 const MIN_EFFECTIVE_VMG = 0.514444;
 
 const LEGEND_CURRENT = 'Current cog/sog to start';
-const LEGEND_BEST = 'Best VMG to start';
 const LEGEND_STUB = 'Current course over ground (no timer running)';
 
 /**
@@ -67,7 +50,6 @@ export interface IRacerLineViewData {
   fixTime: number | null;
   heading: number | null; cog: number | null; sog: number | null;
   lineLength: number | null; lineBearing: number | null;
-  approachCog: number | null; approachSog: number | null;
   timeToStart: number | null; timerRunning: boolean;
   /** True wind direction, the bearing the wind blows FROM. */
   twd: number | null;
@@ -82,8 +64,6 @@ export interface IRacerLineViewData {
 interface ISceneProjection {
   x1: number; y1: number; x2: number; y2: number;
   width: number; opacity: number; title: string;
-  /** The best-VMG course, highlighted in its own colour against the current one. */
-  best: boolean;
 }
 
 /** One arm of the VMG cross. */
@@ -189,8 +169,6 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   public numDecimal = input<number>(1);
   /** Percent of the drawing's height the view may drift before it re-fits. */
   public viewSmoothing = input<number>(10);
-  /** Show the course sailed behind the best VMG as a third projection. */
-  public showBestApproach = input<boolean>(false);
 
   private readonly units = inject(UnitsService);
 
@@ -208,8 +186,6 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   private readonly sog = computed(() => this.data().sog);
   private readonly lineLength = computed(() => this.data().lineLength);
   private readonly lineBearing = computed(() => this.data().lineBearing);
-  private readonly approachCog = computed(() => this.data().approachCog);
-  private readonly approachSog = computed(() => this.data().approachSog);
   private readonly timeToStart = computed(() => this.data().timeToStart);
   private readonly timerRunning = computed(() => this.data().timerRunning);
   private readonly twd = computed(() => this.data().twd);
@@ -779,39 +755,25 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     const project = (speed: number) => Math.min(speed * tts * scale, 600);
 
     let thickLabel: string | null = null;
-    let thinLabel: string | null = null;
     const cog = this.cog();
     if (cog != null) {
       const running = this.timerRunning() && tts > 0;
       const v = screenVector(cog, geo.bearing);
       const sog = this.sog();
-      const approachCog = this.approachCog(), approachSog = this.approachSog();
 
       if (running) {
-        // Off by default: a real point of sail, but not the path the time to line is
-        // built on, and shown beside that path the two get confused.
-        const showApproach = this.showBestApproach();
-        if (showApproach && approachCog != null && approachSog != null && approachSog > 0) {
-          const av = screenVector(approachCog, geo.bearing);
-          const len = project(approachSog);
-          scene.projections.push({
-            x1: bx, y1: by, x2: bx + av.x * len, y2: by + av.y * len,
-            width: 4, opacity: 0.85, title: LEGEND_BEST, best: true
-          });
-          thinLabel = LEGEND_BEST;
-        }
         if (sog != null) {
           const len = project(sog);
           scene.projections.push({
             x1: bx, y1: by, x2: bx + v.x * len, y2: by + v.y * len,
-            width: 6, opacity: 0.55, title: LEGEND_CURRENT, best: false
+            width: 6, opacity: 0.55, title: LEGEND_CURRENT
           });
           thickLabel = LEGEND_CURRENT;
         }
       } else {
         scene.projections.push({
           x1: bx, y1: by, x2: bx + v.x * 40, y2: by + v.y * 40,
-          width: 6, opacity: 0.55, title: LEGEND_STUB, best: false
+          width: 6, opacity: 0.55, title: LEGEND_STUB
         });
         thickLabel = LEGEND_STUB;
       }
@@ -843,8 +805,7 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // Hovering the boat reports what it is doing, and says what the two lines running
     // from it mean - they are only described here, to keep the drawing uncluttered.
     const tip = [`SOG ${this.formatKnots(this.sog())}  COG ${this.formatBearing(cog)}`];
-    if (thickLabel) tip.push(`Thick line: ${thickLabel}`);
-    if (thinLabel) tip.push(`Thin line: ${thinLabel}`);
+    if (thickLabel) tip.push(thickLabel);
 
     scene.boat = { path, ocs, title: tip.join('\n') };
   }

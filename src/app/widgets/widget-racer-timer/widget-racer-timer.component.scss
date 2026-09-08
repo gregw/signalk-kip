@@ -22,7 +22,7 @@
 // widget; the drawing takes whatever is left.
 .filler {
   width: 100%;
-  height: calc(100% - var(--racer-button-row, 68px));
+  height: calc(100% - var(--racer-button-row, 24%));
 }
 
 .buttons-container {
@@ -31,7 +31,7 @@
   justify-content: space-between;
   column-gap: 2%;
   position: relative;
-  height: var(--racer-button-row, 68px);
+  height: var(--racer-button-row, 24%);
   width: 100%;
   padding: 0px 10px 14px 10px;
   z-index: 20;

@@ -574,9 +574,9 @@ export class WidgetService {
       componentClassName: 'WidgetRacesteerComponent'
     },
     {
-      name: 'Racer - Start Line Insight',
+      name: 'Racer - Start Line Setup',
       description: 'Gain a tactical advantage for racing starts: set and adjust the port and starboard ends of the start line, see your distance to the line, the favored end, and how much the line is favored or unfavored. Includes visual integration with Freeboard SK for interactive line adjustment and display.',
-      icon: 'racerlineWidget',
+      icon: 'racerlinesetupWidget',
       minWidth: 4,
       minHeight: 4,
       defaultWidth: 4,
@@ -587,8 +587,8 @@ export class WidgetService {
       componentClassName: 'WidgetRacerLineComponent',
     },
     {
-      name: 'Racer - Start Line Approach',
-      description: 'Visualize your approach to the start line: the line drawn "line up" with the pin to port and the committee boat to starboard, your boat against it, and projections showing where you reach at the gun on your current course and on the best course you have recently sailed. A second mode shows the four best VMGs behind the time to line and lets you adjust them. Requires signalk-racer 1.2.0 or later.',
+      name: 'Racer - Start Line Visualization',
+      description: 'A full-frame view of the start line: the line drawn "line up" with the pin to port and the committee boat to starboard, your boat against it at true scale, the start zone it sits in, and the approach the time to line is computed over.',
       icon: 'racerlineWidget',
       minWidth: 4,
       minHeight: 4,

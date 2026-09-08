@@ -396,9 +396,23 @@ export interface IWidgetSvcConfig {
    */
   showBestApproach?: boolean;
   /**
-   * Height in pixels of the racer widgets' button row. Fixed rather than a share of the
-   * widget so the buttons stay the same size, and stay comfortably pressable with a
-   * finger on a phone, whatever height the widget is given on the dashboard.
+   * Show the countdown to the start alongside the distance to the line, above the time
+   * to line it has to be read against. Off by default: the countdown has a widget of its
+   * own, and leaving it out gives the distance the whole width.
+   */
+  showTimeToStart?: boolean;
+  /**
+   * Seconds a racer widget stays in a control mode after the last button press before
+   * dropping back to its default display. The control modes exist to be used and left,
+   * and a widget silently stuck on one is a widget not showing the numbers. 0 disables
+   * the revert and the mode stays until it is changed by hand.
+   */
+  modeTimeout?: number;
+  /**
+   * Height in pixels of the racer widgets' button row. A fixed height keeps the buttons
+   * the same size, and comfortably pressable with a finger on a phone, whatever height
+   * the widget is given on the dashboard. 0 - the default - gives the row a share of the
+   * widget instead, which is how it behaved before this setting existed.
    */
   buttonRowHeight?: number;
   /**

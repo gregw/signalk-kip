@@ -24,15 +24,33 @@ import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {ITheme} from '../../core/services/app-service';
 import {MatTooltipModule} from '@angular/material/tooltip';
+import {
+  IRacerLineViewData,
+  RacerLineViewComponent,
+  TVmgName,
+  VMG_ARROW,
+  VMG_NAMES,
+  VMG_TITLE
+} from '../racer-line-view/racer-line-view.component';
+import {UnitsService} from '../../core/services/units.service';
+
+/** The share of the widget the button row takes when no fixed height is set. */
+const BUTTON_ROW_SHARE = '24%';
 
 @Component({
   selector: 'widget-racer-line',
   // Sized on the host so the row is the same height in every racer widget, whatever
   // the template around it looks like.
-  host: { '[style.--racer-button-row]': "buttonRowHeight() + 'px'" },
+  host: {
+    '[style.--racer-button-row]': 'buttonRowCss()',
+    // Any interaction anywhere in the widget restarts the idle countdown back to mode 0.
+    // Bound on the host rather than the button row so no press can be missed as modes
+    // are added, and so no plain container has to be made an interaction target.
+    '(click)': 'touchMode()'
+  },
   templateUrl: './widget-racer-line.component.html',
   styleUrls: ['./widget-racer-line.component.scss'],
-  imports: [MatButtonModule, MatIconModule, MatTooltipModule]
+  imports: [MatButtonModule, MatIconModule, MatTooltipModule, RacerLineViewComponent]
 })
 export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   // Functional inputs (Host2 contract)
@@ -46,12 +64,12 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private readonly canvas = inject(CanvasService);
   protected readonly dashboard = inject(DashboardService);
   private readonly signalk = inject(SignalkRequestsService);
+  private readonly units = inject(UnitsService);
   private readonly destroyRef = inject(DestroyRef);
 
   // Static config from legacy defaultConfig
   public static readonly DEFAULT_CONFIG: IWidgetSvcConfig = {
     supportAutomaticHistoricalSeries: false,
-    buttonRowHeight: 68,
     displayName: 'DTS',
     filterSelfPaths: true,
     playBeeps: true,
@@ -60,6 +78,11 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     numDecimal: 0,
     ignoreZones: true,
     color: 'contrast',
+    viewSmoothing: 10,
+    modeTimeout: 10,
+    showTimeToStart: false,
+    showBestApproach: false,
+    buttonRowHeight: 0,
     enableTimeout: false,
     dataTimeout: 5,
     paths: {
@@ -136,6 +159,194 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
         pathSkUnitsFilter: 's',
         sampleTime: 500
       },
+      portLatPath: {
+        description: 'Latitude of the port (pin) end of the start line',
+        path: 'self.navigation.racing.startLinePort.latitude',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'pdeg', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null, sampleTime: 1000
+      },
+      portLonPath: {
+        description: 'Longitude of the port (pin) end of the start line',
+        path: 'self.navigation.racing.startLinePort.longitude',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'pdeg', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null, sampleTime: 1000
+      },
+      stbLatPath: {
+        description: 'Latitude of the starboard (boat) end of the start line',
+        path: 'self.navigation.racing.startLineStb.latitude',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'pdeg', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null, sampleTime: 1000
+      },
+      stbLonPath: {
+        description: 'Longitude of the starboard (boat) end of the start line',
+        path: 'self.navigation.racing.startLineStb.longitude',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'pdeg', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null, sampleTime: 1000
+      },
+      latPath: {
+        description: 'Latitude of the vessel',
+        path: 'self.navigation.position.latitude',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'pdeg', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null, sampleTime: 500
+      },
+      lonPath: {
+        description: 'Longitude of the vessel',
+        path: 'self.navigation.position.longitude',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'pdeg', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: null, sampleTime: 500
+      },
+      headingPath: {
+        description: 'True heading of the vessel',
+        path: 'self.navigation.headingTrue',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad', sampleTime: 500
+      },
+      twdPath: {
+        description: 'True wind direction',
+        path: 'self.environment.wind.directionTrue',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad', sampleTime: 1000
+      },
+      cogPath: {
+        description: 'Course over ground (true) of the vessel',
+        path: 'self.navigation.courseOverGroundTrue',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad', sampleTime: 500
+      },
+      sogPath: {
+        // Kept in m/s: the projections are metres on the ground, not a readout.
+        description: 'Speed over ground of the vessel',
+        path: 'self.navigation.speedOverGround',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 500
+      },
+      lineBearingPath: {
+        description: 'Bearing of the start line',
+        path: 'self.navigation.racing.startLineBearing',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad', sampleTime: 1000
+      },
+      approachCogPath: {
+        description: 'Course sailed behind the best VMG to the line',
+        path: 'self.navigation.racing.bestApproach.cog',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'rad', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'rad', sampleTime: 1000
+      },
+      approachSogPath: {
+        description: 'Speed sailed behind the best VMG to the line',
+        path: 'self.navigation.racing.bestApproach.sog',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      ttsPath: {
+        description: 'Time to the start in seconds',
+        path: 'self.navigation.racing.timeToStart',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 's', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 's', sampleTime: 500
+      },
+      startTimePath: {
+        // Cleared by the plugin whenever the timer is not counting down, so it
+        // doubles as the running flag.
+        description: 'Time of the start',
+        path: 'self.navigation.racing.startTime',
+        source: 'default', pathType: 'Date', pathRequired: false, isPathConfigurable: false,
+        sampleTime: 1000
+      },
+      boatLengthPath: {
+        // Drawn to the same scale as the line, so the triangle is the vessel's real size.
+        description: 'Overall length of the vessel',
+        path: 'self.design.length.overall',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm', sampleTime: 10000
+      },
+      effectiveVmgToLinePath: {
+        // What the plugin's time to line actually divides the perpendicular leg by:
+        // the collected best, or the VMG being sailed now if that is better. Published
+        // from signalk-racer 1.3.0; derived locally when it is absent.
+        description: 'VMG the perpendicular leg of the time to line is divided by',
+        path: 'self.navigation.racing.effectiveVmg.toLine',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      effectiveVmgAlongLinePath: {
+        description: 'VMG the along-line leg of the time to line is divided by',
+        path: 'self.navigation.racing.effectiveVmg.alongLine',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'm/s', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgToCourseSidePath: {
+        description: 'Best VMG across the line towards the course side',
+        path: 'self.navigation.racing.bestVmg.toCourseSide',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: true, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgToPortEndPath: {
+        description: 'Best VMG along the line towards the port end (pin)',
+        path: 'self.navigation.racing.bestVmg.toPortEnd',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgToStbEndPath: {
+        description: 'Best VMG along the line towards the starboard end (boat)',
+        path: 'self.navigation.racing.bestVmg.toStbEnd',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgFromCourseSidePath: {
+        description: 'Best VMG back across the line from the course side',
+        path: 'self.navigation.racing.bestVmg.fromCourseSide',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgToCourseSideOverridePath: {
+        description: 'Manual adjustment behind the best VMG towards the course side',
+        path: 'self.navigation.racing.bestVmg.toCourseSide.override',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgToPortEndOverridePath: {
+        description: 'Manual adjustment behind the best VMG towards the port end',
+        path: 'self.navigation.racing.bestVmg.toPortEnd.override',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgToStbEndOverridePath: {
+        description: 'Manual adjustment behind the best VMG towards the starboard end',
+        path: 'self.navigation.racing.bestVmg.toStbEnd.override',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
+      vmgFromCourseSideOverridePath: {
+        description: 'Manual adjustment behind the best VMG from the course side',
+        path: 'self.navigation.racing.bestVmg.fromCourseSide.override',
+        source: 'default', pathType: 'number', pathRequired: false, isPathConfigurable: false,
+        convertUnitTo: 'knots', showConvertUnitTo: false, showPathSkUnitsFilter: false,
+        pathSkUnitsFilter: 'm/s', sampleTime: 1000
+      },
       ttbPath: {
         description: 'Time to delay before sailing to the start line in seconds',
         path: 'self.navigation.racing.timeToBurn',
@@ -158,9 +369,6 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private ctx: CanvasRenderingContext2D | null = null;
   private cssWidth = 0;
   private cssHeight = 0;
-  private titleBitmap: HTMLCanvasElement | null = null;
-  private titleBitmapText: string | null = null;
-  private titleBitmapColor: string | null = null;
 
   // State
   private dtsValue: number | null = null;
@@ -168,6 +376,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private biasValue: number | null = null;
   private ttlValue: number | null = null;
   private ttbValue: number | null = null;
+  private ttsValue: number | null = null;
   protected labelColor = signal<string>('');
   private valueColor = '';
   private dtsColor = '';
@@ -179,6 +388,25 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   protected portBiasValue = signal<string>('');
   protected lineLengthValue = signal<string>('');
   protected stbBiasValue = signal<string>('');
+  // Live values the line drawing needs. The widget owns the subscriptions; the view is
+  // handed the lot as one object.
+  private readonly view = signal<IRacerLineViewData>({
+    portLat: null, portLon: null, stbLat: null, stbLon: null,
+    lat: null, lon: null, fixTime: null,
+    heading: null, cog: null, sog: null,
+    lineLength: null, lineBearing: null,
+    approachCog: null, approachSog: null,
+    timeToStart: null, timerRunning: false, twd: null,
+    boatLength: null, effVmgToLine: null, effVmgAlongLine: null,
+    bestVmg: {toCourseSide: null, toPortEnd: null, toStbEnd: null, fromCourseSide: null},
+    vmgOverride: {toCourseSide: null, toPortEnd: null, toStbEnd: null, fromCourseSide: null}
+  });
+  protected readonly viewData = this.view.asReadonly();
+  protected readonly selectedVmg = signal<TVmgName | null>(null);
+  protected readonly palette = signal<{color: string; dim: string; dimmer: string}>(
+    {color: 'var(--kip-contrast-color)', dim: 'var(--kip-contrast-dim-color)',
+      dimmer: 'var(--kip-contrast-dimmer-color)'});
+
   protected mode = signal<number>(0);
   private readonly normalizedConfig = signal<IWidgetSvcConfig>(WidgetRacerLineComponent.DEFAULT_CONFIG);
   private get pathsRecord(): Record<string, IWidgetPath> {
@@ -186,8 +414,19 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   }
 
   /** Fixed height of the button row, so touch targets do not shrink with the widget. */
+  /**
+   * Height of the button row. 0 - the default - gives it a share of the widget instead
+   * of a fixed size, which is how it behaved before the setting existed; anything else
+   * is a pixel height, so the touch targets stay put however tall the widget is.
+   */
   protected readonly buttonRowHeight = computed<number>(() =>
-    (this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG).buttonRowHeight ?? 68);
+    (this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG).buttonRowHeight ?? 0);
+
+  /** That height as a CSS length: a percentage when it is left to share the widget. */
+  protected readonly buttonRowCss = computed<string>(() => {
+    const pixels = this.buttonRowHeight();
+    return pixels > 0 ? `${pixels}px` : BUTTON_ROW_SHARE;
+  });
 
   constructor() {
     // Theme/palette effect
@@ -197,6 +436,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       if (!theme) return;
       untracked(() => {
         const palette = getColors(cfg.color ?? 'contrast', theme);
+        this.palette.set(palette);
         this.labelColor.set(palette.dim);
         this.valueColor = palette.color;
         this.draw();
@@ -220,6 +460,7 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       if (!pathCfg?.path) return;
       untracked(() => this.streams.observe('lineLengthPath', pkt => {
         this.lengthValue = pkt?.data?.value ?? null;
+        this.view.update(d => ({...d, lineLength: this.lengthValue}));
         this.setLenBias();
         this.draw();
       }));
@@ -298,6 +539,53 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     });
 
     // Request feedback beep
+    // Streams the line drawing needs. Each lands in the one view object so the child
+    // recomputes its scene once per update rather than once per path.
+    const num = (key: string, apply: (v: number | null, at: number | null) => void) => {
+      effect(() => {
+        if (!this.pathsRecord[key]?.path) return;
+        untracked(() => this.streams.observe(key, pkt => {
+          const value = pkt?.data?.value;
+          const at = pkt?.data?.timestamp;
+          apply(typeof value === 'number' ? value : null, at ? at.getTime() : null);
+          this.draw();
+        }));
+      });
+    };
+    num('portLatPath', v => this.view.update(d => ({...d, portLat: v})));
+    num('portLonPath', v => this.view.update(d => ({...d, portLon: v})));
+    num('stbLatPath', v => this.view.update(d => ({...d, stbLat: v})));
+    num('stbLonPath', v => this.view.update(d => ({...d, stbLon: v})));
+    num('latPath', (v, at) => this.view.update(d => ({...d, lat: v, fixTime: at})));
+    num('lonPath', v => this.view.update(d => ({...d, lon: v})));
+    num('headingPath', v => this.view.update(d => ({...d, heading: v})));
+    num('cogPath', v => this.view.update(d => ({...d, cog: v})));
+    num('twdPath', v => this.view.update(d => ({...d, twd: v})));
+    num('sogPath', v => this.view.update(d => ({...d, sog: v})));
+    num('lineBearingPath', v => this.view.update(d => ({...d, lineBearing: v})));
+    num('approachCogPath', v => this.view.update(d => ({...d, approachCog: v})));
+    num('approachSogPath', v => this.view.update(d => ({...d, approachSog: v})));
+    num('ttsPath', v => {
+      this.ttsValue = v;
+      this.view.update(d => ({...d, timeToStart: v}));
+    });
+    num('boatLengthPath', v => this.view.update(d => ({...d, boatLength: v})));
+    num('effectiveVmgToLinePath', v => this.view.update(d => ({...d, effVmgToLine: v})));
+    num('effectiveVmgAlongLinePath', v => this.view.update(d => ({...d, effVmgAlongLine: v})));
+    for (const name of VMG_NAMES) {
+      const cap = name.charAt(0).toUpperCase() + name.slice(1);
+      num(`vmg${cap}Path`, v =>
+        this.view.update(d => ({...d, bestVmg: {...d.bestVmg, [name]: v}})));
+      num(`vmg${cap}OverridePath`, v =>
+        this.view.update(d => ({...d, vmgOverride: {...d.vmgOverride, [name]: v}})));
+    }
+
+    effect(() => {
+      if (!this.pathsRecord['startTimePath']?.path) return;
+      untracked(() => this.streams.observe('startTimePath', pkt =>
+        this.view.update(d => ({...d, timerRunning: !!pkt?.data?.value}))));
+    });
+
     this.signalk.subscribeRequest().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(result => {
       if (result.widgetUUID === this.id()) {
         if (result.statusCode === 200) this.beep(600, 20);
@@ -326,8 +614,117 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   }
 
   // Interaction methods
+  /** The mode that hands the display over to the line drawing, for editing the VMGs. */
+  protected readonly isViewMode = computed<boolean>(() => this.mode() === 5);
+
+  private cfg(): IWidgetSvcConfig {
+    return this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG;
+  }
+
+  protected readonly displayName = computed<string>(() => this.cfg().displayName || 'DTS');
+  protected readonly numDecimal = computed<number>(() => this.cfg().numDecimal ?? 1);
+  protected readonly viewSmoothing = computed<number>(() => this.cfg().viewSmoothing ?? 10);
+  protected readonly showBestApproach = computed<boolean>(() => this.cfg().showBestApproach ?? false);
+  protected readonly lengthUnit = computed<string>(() =>
+    this.pathsRecord['lineLengthPath']?.convertUnitTo ?? 'm');
+  protected readonly vmgUnit = computed<string>(() =>
+    this.pathsRecord['vmgToCourseSidePath']?.convertUnitTo ?? 'knots');
+
+  /** Label on the VMG select button: the arrow shows where the value sits on the cross. */
+  protected readonly vmgButtonLabel = computed<string>(() => {
+    const name = this.selectedVmg();
+    return name ? `VMG ${VMG_ARROW[name]}` : 'VMG \u2013';
+  });
+
+  protected readonly vmgButtonTooltip = computed<string>(() => {
+    const name = this.selectedVmg();
+    return name ? `Editing: ${VMG_TITLE[name]}. Press to select the next VMG.`
+      : 'Select a best VMG to edit';
+  });
+
+  protected readonly vmgResetTooltip = computed<string>(() => {
+    const name = this.selectedVmg();
+    return name ? `Clear the manual adjustment to: ${VMG_TITLE[name]}`
+      : 'Clear the manual adjustments to all four best VMGs';
+  });
+
+  protected readonly vmgStepLabel = computed<string>(() => {
+    const unit = this.vmgUnit();
+    return `0.1${unit === 'knots' ? 'kn' : unit}`;
+  });
+
+  /** Cycle the edited VMG through the four values and back to none selected. */
+  public cycleVmg(): void {
+    const current = this.selectedVmg();
+    const index = current === null ? 0 : VMG_NAMES.indexOf(current) + 1;
+    this.selectedVmg.set(index >= VMG_NAMES.length ? null : VMG_NAMES[index]);
+  }
+
+  /**
+   * Adjust the selected best VMG by one step. The buttons work in whatever unit the VMG
+   * paths display in, the plugin's API in m/s, so the step is converted back.
+   */
+  public adjustVmg(steps: number): void {
+    const name = this.selectedVmg();
+    if (!name) return;
+    // Speed conversions are linear through zero, so one base unit converted gives the
+    // display units per m/s to divide the step by.
+    const perBaseUnit = this.units.convertToUnit(this.vmgUnit(), 1) || 1;
+    this.signalk.putRequest('navigation.racing.setBestVmg',
+      {vmg: name, delta: (steps * 0.1) / perBaseUnit}, this.id());
+  }
+
+  /**
+   * Clear the manual adjustment behind the selected best VMG. With none selected, all
+   * four are cleared - which is what the plugin does when the request names none.
+   */
+  public resetVmg(): void {
+    const name = this.selectedVmg();
+    this.signalk.putRequest('navigation.racing.setBestVmg',
+      name ? {vmg: name, command: 'reset'} : {command: 'reset'}, this.id());
+  }
+
+  /**
+   * Throw away every collected VMG sample. Offered in place of the reset button when no
+   * VMG is selected, there being no single adjustment to revert then.
+   */
+  public clearVmgSamples(): void {
+    this.signalk.putRequest('navigation.racing.setBestVmg', {command: 'clear'}, this.id());
+  }
+
+  protected readonly modeTimeout = computed<number>(() => this.cfg().modeTimeout ?? 10);
+  private readonly showTimeToStart = computed<boolean>(() => this.cfg().showTimeToStart ?? false);
+
+  /** Pending revert to the default display, if a control mode is showing. */
+  private modeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Restart the idle countdown after a button press.
+   *
+   * The control modes are meant to be used and left, and a widget parked on one is a
+   * widget not showing its numbers - easily done on a boat, where the last press before
+   * a start is rarely followed by a deliberate press back. Bound to the button row
+   * rather than to each action, so a press cannot be missed as modes are added.
+   */
+  protected touchMode(): void {
+    if (this.modeTimer) {
+      clearTimeout(this.modeTimer);
+      this.modeTimer = null;
+    }
+    const seconds = this.modeTimeout();
+    if (this.mode() === 0 || !(seconds > 0)) return;
+    this.modeTimer = setTimeout(() => {
+      this.modeTimer = null;
+      this.mode.set(0);
+      this.selectedVmg.set(null);
+      this.draw();
+    }, seconds * 1000);
+  }
+
   public toggleMode(): void {
-    this.mode.update(v => (v + 1) % 5);
+    this.mode.update(v => (v + 1) % 6);
+    if (this.mode() !== 5) this.selectedVmg.set(null);
+    this.touchMode();
     this.draw();
   }
 
@@ -375,23 +772,61 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   private draw(): void {
     if (!this.ctx || !this.canvasElement) return;
     const cfg = this.runtime.options() ?? WidgetRacerLineComponent.DEFAULT_CONFIG;
+    // The widget's name labels its own value, the way TTS, TTL and TTB do, rather than
+    // sitting alone across the top: four readouts with one unlabelled is harder to read
+    // than four labelled the same way, and it frees the top band for the numbers.
     const name = cfg?.displayName || 'DTS';
-    const titleColor = this.labelColor();
-    if (!this.titleBitmap || !cfg || this.titleBitmap.width !== this.canvasElement.width || this.titleBitmap.height !== this.canvasElement.height || this.titleBitmapText !== name || this.titleBitmapColor !== titleColor) {
-      this.titleBitmap = this.canvas.createTitleBitmap(name, titleColor, 'normal', this.cssWidth, this.cssHeight);
-      this.titleBitmapText = name;
-      this.titleBitmapColor = titleColor;
-    }
     this.canvas.clearCanvas(this.ctx, this.cssWidth, this.cssHeight);
-    if (this.titleBitmap) this.ctx.drawImage(this.titleBitmap, 0, 0, this.cssWidth, this.cssHeight);
+
+    // A 50:50 split: the distance to the line owns the top half, the two times the
+    // bottom. Each half is sized independently so neither crowds the other whatever the
+    // widget's aspect. In each, the label sits at the top of its zone and the value
+    // below it, so the four readouts line up as two rows of labels and two of values.
+    const half = Math.floor(this.cssHeight * 0.5);
+    const labelInset = Math.floor(this.cssHeight * 0.02);
+    const labelHeight = Math.floor(half * 0.22);
+    const labelWidth = Math.floor(this.cssWidth * 0.11);
+    // All four labels are the dim palette colour: they name the readouts rather than
+    // carrying a value, so they should not follow the distance into its alarm colours.
+    const labelColor = this.labelColor();
+
+    // With the countdown showing it takes the left of the top half, directly above the
+    // time to line it has to be read against, and the distance moves over beside it.
+    const withTts = this.showTimeToStart();
+    const topValueY = Math.floor(this.cssHeight * 0.30);
+
+    if (withTts) {
+      this.canvas.drawText(
+        this.ctx, 'TTS',
+        Math.floor(this.cssWidth * 0.02), labelInset,
+        labelWidth, labelHeight,
+        'normal', labelColor, 'left', 'top'
+      );
+      this.canvas.drawText(
+        this.ctx, this.toHHMMSS(this.ttsValue),
+        Math.floor(this.cssWidth * 0.14), topValueY,
+        // Stops short of where the distance begins, so a long countdown cannot run into it.
+        Math.floor(this.cssWidth * 0.32),
+        Math.floor(half * 0.62),
+        'bold', this.dtsColor, 'left', 'middle'
+      );
+    }
+
+    this.canvas.drawText(
+      this.ctx, name,
+      Math.floor(this.cssWidth * (withTts ? 0.49 : 0.02)), labelInset,
+      labelWidth, labelHeight,
+      'normal', labelColor, 'left', 'top'
+    );
 
     this.canvas.drawText(
       this.ctx,
       this.getValueText(),
-      Math.floor(this.cssWidth * 0.5),
-      Math.floor(this.cssHeight * 0.325),
-      Math.floor(this.cssWidth * 0.95),
-      Math.floor(this.cssHeight * 0.55),
+      // Clears its own label horizontally, so the label sitting at the top of the zone
+      // costs the value no height.
+      Math.floor(this.cssWidth * (withTts ? 0.79 : 0.55)), topValueY,
+      Math.floor(this.cssWidth * (withTts ? 0.36 : 0.80)),
+      Math.floor(half * 0.84),
       'bold',
       this.dtsColor,
       'center',
@@ -402,65 +837,45 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
       this.ctx,
       this.pathsRecord['dtsPath']?.convertUnitTo || 'm',
       Math.floor(this.cssWidth * 0.975),
-      Math.floor(this.cssHeight * 0.60),
-      Math.floor(this.cssWidth * 0.95),
-      Math.floor(this.cssHeight * 0.15),
+      half,
+      Math.floor(this.cssWidth * 0.3),
+      Math.floor(half * 0.18),
       'normal',
       this.dtsColor,
       'right',
       'bottom'
     );
 
-    this.canvas.drawText(
-      this.ctx,
-      'TTL',
-      Math.floor(this.cssWidth * 0.025),
-      Math.floor(this.cssHeight * 0.7),
-      Math.floor(this.cssWidth * 0.10),
-      Math.floor(this.cssHeight * 0.15),
-      'normal',
-      this.dtsColor,
-      'left',
-      'middle'
-    );
+    // The bottom half carries TTL on the left and TTB on the right, laid out the same
+    // way: the label at the top of the half, the value filling the half beside it.
+    const timeY = Math.floor(this.cssHeight * 0.76);
+    const timeLabelY = half + labelInset;
+    const valueWidth = Math.floor(this.cssWidth * 0.36);
+    const valueHeight = Math.floor(half * 0.62);
 
     this.canvas.drawText(
-      this.ctx,
-      this.getTimeToLineText(),
-      Math.floor(this.cssWidth * 0.15),
-      Math.floor(this.cssHeight - 0.80),
-      Math.floor(this.cssWidth * 0.35),
-      Math.floor(this.cssHeight * 0.35),
-      'bold',
-      this.dtsColor,
-      'left',
-      'bottom'
+      this.ctx, 'TTL',
+      Math.floor(this.cssWidth * 0.02), timeLabelY,
+      labelWidth, labelHeight,
+      'normal', labelColor, 'left', 'top'
     );
-
     this.canvas.drawText(
-      this.ctx,
-      'TTB',
-      Math.floor(this.cssWidth * 0.525),
-      Math.floor(this.cssHeight * 0.7),
-      Math.floor(this.cssWidth * 0.10),
-      Math.floor(this.cssHeight * 0.15),
-      'normal',
-      this.dtsColor,
-      'left',
-      'middle'
+      this.ctx, this.getTimeToLineText(),
+      Math.floor(this.cssWidth * 0.14), timeY,
+      valueWidth, valueHeight,
+      'bold', this.dtsColor, 'left', 'middle'
     );
-
     this.canvas.drawText(
-      this.ctx,
-      this.getTimeToBurnText(),
-      Math.floor(this.cssWidth * 0.65),
-      Math.floor(this.cssHeight - 0.80),
-      Math.floor(this.cssWidth * 0.35),
-      Math.floor(this.cssHeight * 0.35),
-      'bold',
-      this.dtsColor,
-      'left',
-      'bottom'
+      this.ctx, 'TTB',
+      Math.floor(this.cssWidth * 0.52), timeLabelY,
+      labelWidth, labelHeight,
+      'normal', labelColor, 'left', 'top'
+    );
+    this.canvas.drawText(
+      this.ctx, this.getTimeToBurnText(),
+      Math.floor(this.cssWidth * 0.64), timeY,
+      valueWidth, valueHeight,
+      'bold', this.dtsColor, 'left', 'middle'
     );
 
     this.setLenBias();
@@ -558,6 +973,10 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.modeTimer) {
+      clearTimeout(this.modeTimer);
+      this.modeTimer = null;
+    }
     try {
       if (this.canvasElement) this.canvas.unregisterCanvas(this.canvasElement);
     } catch { /* ignore */ }

@@ -156,19 +156,39 @@
                   Show best VMG course sailed
                 </mat-checkbox>
               }
+              @if (($safeNavigationMigration(widgetConfig?.showTimeToStart) !== undefined)) {
+                <mat-checkbox name="showTimeToStart" formControlName="showTimeToStart">
+                  Show Time To Start
+                </mat-checkbox>
+              }
+              @if (($safeNavigationMigration(widgetConfig?.modeTimeout) !== undefined)) {
+                <mat-form-field>
+                  <mat-label>Mode Timeout</mat-label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="300"
+                    matInput
+                    placeholder="Enter seconds..."
+                    name="modeTimeout"
+                    formControlName="modeTimeout"
+                  />
+                  <mat-hint>Seconds before a control mode reverts; 0 to stay put</mat-hint>
+                </mat-form-field>
+              }
               @if (($safeNavigationMigration(widgetConfig?.buttonRowHeight) !== undefined)) {
                 <mat-form-field>
                   <mat-label>Button Row Height</mat-label>
                   <input
                     type="number"
-                    min="32"
+                    min="0"
                     max="160"
                     matInput
                     placeholder="Enter pixels..."
                     name="buttonRowHeight"
                     formControlName="buttonRowHeight"
                   />
-                  <mat-hint>Pixels; larger is easier to press on a touch screen</mat-hint>
+                  <mat-hint>Pixels, or 0 to scale with the widget</mat-hint>
                 </mat-form-field>
               }
               @if (($safeNavigationMigration(widgetConfig?.viewSmoothing) !== undefined)) {

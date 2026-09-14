@@ -11,9 +11,9 @@ import {
   untracked,
   viewChild
 } from '@angular/core';
-import { UnitsService } from '../../core/services/units.service';
+import { UnitsService } from '../../../core/services/units.service';
 import { ILatLon, ILineGeometry, lineGeometry, screenVector } from './start-line-geometry.util';
-import { TVmgName, VMG_NAMES, VMG_TITLE } from '../racer-vmg.constants';
+import { TVmgName, VMG_NAMES, VMG_TITLE } from '../../racer-vmg.constants';
 export type { TVmgName };
 
 declare global {

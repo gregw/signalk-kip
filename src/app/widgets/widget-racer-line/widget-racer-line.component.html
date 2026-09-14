@@ -1,8 +1,4 @@
 <div class="line-wrapper">
-  <!-- Modes 5+ hand the display over to the line drawing, which overlays the
-       canvas rather than replacing it: the canvas keeps its size and its registration
-       with the canvas service across a mode change, so switching back needs no redraw
-       dance. .filler is the spacer that reserves the area above the button row. -->
   <div class="filler">
     <canvas #canvasMainRef class="line-canvas" [class.hidden]="isViewMode()"></canvas>
   </div>

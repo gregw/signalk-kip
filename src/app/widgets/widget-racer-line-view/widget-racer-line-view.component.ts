@@ -15,7 +15,7 @@ import { getColors } from '../../core/utils/themeColors.utils';
 import {
   IRacerLineViewData,
   RacerLineViewComponent
-} from '../racer-line-view/racer-line-view.component';
+} from './racer-line-view/racer-line-view.component';
 import { NO_VMG, VMG_NAMES } from '../racer-vmg.constants';
 
 /**
@@ -23,16 +23,20 @@ import { NO_VMG, VMG_NAMES } from '../racer-vmg.constants';
  *
  * Purely a display: no modes, no buttons, no editing. Everything that needs a control -
  * setting and adjusting the ends, picking a named line, and editing the best VMGs - lives
- * in the Racer - Start Line Insight widget, which offers this same drawing as one of its
- * modes. This one is for a dashboard slot that should just show the line.
+ * in the Racer - Start Line Setup widget. This one is for a dashboard slot that should
+ * just show the line.
+ *
+ * The drawing itself sits in the child directory rather than here, so it stays a
+ * self-contained component: if a second widget ever needs it again it lifts back out
+ * unchanged.
  */
 @Component({
-  selector: 'widget-racer-start-line',
-  templateUrl: './widget-racer-start-line.component.html',
-  styleUrls: ['./widget-racer-start-line.component.scss'],
+  selector: 'widget-racer-line-view',
+  templateUrl: './widget-racer-line-view.component.html',
+  styleUrls: ['./widget-racer-line-view.component.scss'],
   imports: [RacerLineViewComponent]
 })
-export class WidgetRacerStartLineComponent {
+export class WidgetRacerLineViewComponent {
   public id = input.required<string>();
   public type = input.required<string>();
   public theme = input.required<ITheme>();
@@ -226,7 +230,7 @@ export class WidgetRacerStartLineComponent {
       dimmer: 'var(--kip-contrast-dimmer-color)' });
 
   private cfg(): IWidgetSvcConfig {
-    return this.runtime.options() ?? WidgetRacerStartLineComponent.DEFAULT_CONFIG;
+    return this.runtime.options() ?? WidgetRacerLineViewComponent.DEFAULT_CONFIG;
   }
 
   private get pathsRecord(): Record<string, IWidgetPath> {
@@ -243,7 +247,7 @@ export class WidgetRacerStartLineComponent {
 
   constructor() {
     effect(() => {
-      const cfg = this.runtime.options() ?? WidgetRacerStartLineComponent.DEFAULT_CONFIG;
+      const cfg = this.runtime.options() ?? WidgetRacerLineViewComponent.DEFAULT_CONFIG;
       const theme = this.theme();
       if (!theme) return;
       untracked(() => this.palette.set(getColors(cfg.color ?? 'contrast', theme)));

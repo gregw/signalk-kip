@@ -719,11 +719,13 @@ export class WidgetRacerLineComponent implements AfterViewInit, OnDestroy {
     );
 
     // The bottom half carries TTL on the left and TTB on the right, laid out the same
-    // way: the label at the top of the half, the value filling the half beside it.
-    const timeY = Math.floor(this.cssHeight * 0.76);
+    // way: the label at the top of the half, the value filling the half beside it. The
+    // values sit close to the button row: the space left below them was more than the
+    // row needs to read as separate, and the numbers are worth more than the gap.
+    const timeY = Math.floor(this.cssHeight * 0.785);
     const timeLabelY = half + labelInset;
     const valueWidth = Math.floor(this.cssWidth * 0.36);
-    const valueHeight = Math.floor(half * 0.62);
+    const valueHeight = Math.floor(half * 0.72);
 
     this.canvas.drawText(
       this.ctx, 'TTL',

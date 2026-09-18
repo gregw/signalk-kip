@@ -60,7 +60,7 @@ export interface IRacerLineViewData {
   vmgOverride: Record<TVmgName, number | null>;
 }
 
-/** One of the two projections running from the boat towards the line. */
+/** The projection running from the boat towards the line. */
 interface ISceneProjection {
   x1: number; y1: number; x2: number; y2: number;
   width: number; opacity: number; title: string;
@@ -739,13 +739,12 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * The boat and the two projections running from it. While the timer counts down the
-   * thick line runs along the current COG for the distance the boat will actually cover
-   * before the gun, so its tip shows where it gets to at zero: short of the line is late,
-   * beyond it is early. The thin faint line replays the course actually sailed behind the
-   * best VMG towards the line, on its own bearing, so the two tips compare where you are
-   * heading with where you could be heading. With no timer running only a course stub is
-   * drawn.
+   * The boat, and the projection running from it along the current COG.
+   *
+   * While the timer counts down the projection runs for the distance the boat will
+   * actually cover before the gun, so its tip shows where it gets to at zero: short of
+   * the line is late, beyond it is early. With no timer running there is nothing to
+   * project against, so it degrades to a short stub showing course only.
    */
   private buildBoat(scene: IScene, geo: ILineGeometry, bx: number, by: number,
     lineY: number, ocs: boolean, scale: number): void {
@@ -754,7 +753,7 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     const tts = this.timeToStart() ?? 0;
     const project = (speed: number) => Math.min(speed * tts * scale, 600);
 
-    let thickLabel: string | null = null;
+    let courseLabel: string | null = null;
     const cog = this.cog();
     if (cog != null) {
       const running = this.timerRunning() && tts > 0;
@@ -768,14 +767,14 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
             x1: bx, y1: by, x2: bx + v.x * len, y2: by + v.y * len,
             width: 6, opacity: 0.55, title: LEGEND_CURRENT
           });
-          thickLabel = LEGEND_CURRENT;
+          courseLabel = LEGEND_CURRENT;
         }
       } else {
         scene.projections.push({
           x1: bx, y1: by, x2: bx + v.x * 40, y2: by + v.y * 40,
           width: 6, opacity: 0.55, title: LEGEND_STUB
         });
-        thickLabel = LEGEND_STUB;
+        courseLabel = LEGEND_STUB;
       }
     }
 
@@ -802,10 +801,10 @@ export class RacerLineViewComponent implements AfterViewInit, OnDestroy {
     // first and what is left is the outline.
     const path = `${this.hullPath(at, outerLength)} ${this.hullPath(at, hullLength)}`;
 
-    // Hovering the boat reports what it is doing, and says what the two lines running
-    // from it mean - they are only described here, to keep the drawing uncluttered.
+    // Hovering the boat reports what it is doing, and says what the line running from
+    // it means - it is only described here, to keep the drawing uncluttered.
     const tip = [`SOG ${this.formatKnots(this.sog())}  COG ${this.formatBearing(cog)}`];
-    if (thickLabel) tip.push(thickLabel);
+    if (courseLabel) tip.push(courseLabel);
 
     scene.boat = { path, ocs, title: tip.join('\n') };
   }
